@@ -74,7 +74,7 @@ impl Request {
         request.protocol = String::from("http");
         let result = Url::parse(format!("{}://{}{}",request.protocol, request.header["Host"], words[1]).as_str());
         if result.is_err() {
-            crate::httplistener::HttpListener::log(format!("Cannot parse {}",words[1]).as_str());
+            crate::HttpListener::log(format!("Cannot parse {}",words[1]).as_str());
             return Err("Failed to parse url");
         }
         let url = result.unwrap();
