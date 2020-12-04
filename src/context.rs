@@ -3,10 +3,11 @@ use std::net::TcpStream;
 use std::io::prelude::*;
 use std::net::Shutdown;
 use std::collections::HashMap;
+use crate::HttpListener;
 pub mod response; //Include context/response.rs
 pub mod request; //include context/request.rs
+
 use mime_guess;
-use crate::HttpListener;
 
 
 pub enum HttpMethod {
@@ -45,15 +46,17 @@ impl HttpResponseType {
 
 
 
-pub struct Context<'a> {
+//pub struct Context<'a> {
+pub struct Context {
     stream: TcpStream,
     pub request: Request,
-    pub httplistener: &'a HttpListener,
+//    pub httplistener: &'a HttpListener,
     //response: Response,
 }
 
-impl<'a> Context<'a> {
-    pub fn new(mut stream: TcpStream, httplistener: &HttpListener) -> Result<Context,String> {
+//impl<'a> Context<'a> {
+impl Context {
+    pub fn new(mut stream: TcpStream) -> Result<Context,String> {
 
         let mut buffer = [0; 1024];
     
@@ -73,7 +76,7 @@ impl<'a> Context<'a> {
         Ok(Context {
             stream: stream,
             request: request,
-            httplistener: httplistener,
+            //httplistener: httplistener,
             //response: Response::new(),
         })
     }
@@ -115,7 +118,8 @@ impl<'a> Context<'a> {
     }
 
     pub fn write_cache(&mut self, key: &str) {
-        let result = self.httplistener.get_cache(key);
+        //Caching disabled because I need somewhere to get it (self.httplistener is not a thing anymore)
+        /*let result = self.httplistener.get_cache(key);
         if result.is_err() {
             return;
         }
@@ -133,7 +137,7 @@ impl<'a> Context<'a> {
             _ => {
                 self.write_mime_response(Response::ok_text(String::from_utf8_lossy(content).into_owned().as_str()),mime.essence_str())
             }
-        }
+        }*/
     }
 }
 
