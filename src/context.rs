@@ -56,22 +56,51 @@ pub struct Context {
 
 //impl<'a> Context<'a> {
 impl Context {
-    pub fn new(mut stream: TcpStream) -> Result<Context,String> {
+    pub fn new(stream: TcpStream, request: Request) -> Context {
+        Context {
+            stream: stream,
+            request: request,
+            //httplistener: httplistener,
+            //response: Response::new(),
+        }
+    }
+    pub fn new_(mut stream: TcpStream) -> Result<Context,String> {
 
-        let mut buffer = [0; 1024];
-    
+        let mut buffer = [0; 8192];
+        let mut header_size = 0;
+        
         let read_result  = stream.read(&mut buffer);
         match read_result {
             Err(_) => { return Err(String::from("Failed to read from stream"));},
-            Ok(_) => (),
+            Ok(read) => {
+                header_size = read;
+            },
         }
-        let request_header: String = String::from_utf8_lossy(&buffer[..]).to_string();
         
+        let request_header: String = String::from_utf8_lossy(&buffer[0..header_size]).to_string();
         let request_result = Request::from_request_data(&request_header);
-        let request = match request_result {
+        let mut request = match request_result {
             Ok(r) => r,
             Err(_) => return Err(String::from("Unable to process request")),
         };
+        if request.header.contains_key("Content-Length") {
+            //Read whatever is being sent here
+            loop {
+                let read_result  = stream.read(&mut buffer);
+                match read_result {
+                    Err(_) => { return Err(String::from("Failed to read from stream"));},
+                    Ok(read) => {
+                        if read == 0 {
+                            break;
+                        }
+                        for i in 0..read {
+                            request.body.push(buffer[i]);
+                        }
+                    },
+                }
+                
+            }
+        }
 
         Ok(Context {
             stream: stream,
@@ -110,11 +139,11 @@ impl Context {
             Err(_) => {HttpListener::log(format!("Failed flushing stream").as_str()); return},
             Ok(_) => (),
         }
-        let result = self.stream.shutdown(Shutdown::Both);
+        /*let result = self.stream.shutdown(Shutdown::Both);
         match result {
             Err(_) => {HttpListener::log(format!("Failed shutdown").as_str()); return},
             Ok(_) => (),
-        }
+        }*/
     }
 
     pub fn write_cache(&mut self, key: &str) {
@@ -154,6 +183,7 @@ pub struct Request {
     pub header: HashMap<String,String>,
     pub get: HashMap<String,String>,
     pub post: HashMap<String,String>,
+    pub body: Vec<u8>,
 }
 
 pub struct Response {
