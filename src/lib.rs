@@ -49,6 +49,7 @@ impl HttpListener {
         
         let settings = Settings::new(&self.webroot, routing);
         let arc_settings = Arc::new(settings);
+        //let arc_cache = Arc::new(& self.cache);
         
         let mut counter = 0;
         for stream in listener.incoming()
@@ -61,25 +62,70 @@ impl HttpListener {
             if counter  == 1 {
                 println!("Received first requst");
             }
-            let clone = Arc::clone(&arc_settings);
+            let settings = Arc::clone(&arc_settings);
+            //let cache = Arc::clone(&arc_cache);
             if thread_count > 1 {
                 pool.execute(|| {
-                    HttpListener::handle_connection_static(stream, clone);
+                    //HttpListener::process_cache(stream, settings, cache);
+                    //HttpListener::process(stream, settings);
                 });
             } else {
-                HttpListener::handle_connection_static(stream, clone);
+                let context = HttpListener::receive_context(stream, settings);
+                
             }
         }
     }
+    fn process_cache(stream: TcpStream, settings: Arc<Settings>, cache: Arc<&HashMap<String, (Vec<u8>,Option<mime_guess::Mime>)>>) 
+    {
 
-    fn handle_connection_static(stream: TcpStream, settings: Arc<Settings>) {
-        
-        let context = Context::new(stream);
-        let mut context = match context {
-            Ok(r) => r,
-            Err(_) => return,
-        };
-        
+    }
+    fn receive_context(mut stream: TcpStream, settings: Arc<Settings>) {
+        loop {
+            let mut buffer = [0; 8192];
+            let mut header_size = 0;
+            
+            
+            let read_result  = stream.read(&mut buffer);
+            match read_result {
+                Err(_) => { println!("Failed to read from stream");},
+                Ok(read) => {
+                    header_size = read;
+                },
+            }
+            
+            let request_header: String = String::from_utf8_lossy(&buffer[0..header_size]).to_string();
+            let request_result = Request::from_request_data(&request_header);
+            let mut request = match request_result {
+                Ok(r) => r,
+                Err(_) => { println!("Unable to process request"); return },
+            };
+            if request.header.contains_key("Content-Length") {
+                //Read whatever is being sent here
+                loop {
+                    let read_result  = stream.read(&mut buffer);
+                    match read_result {
+                        Err(_) => { println!("Failed to read from stream"); return },
+                        Ok(read) => {
+                            if read == 0 {
+                                break;
+                            }
+                            for i in 0..read {
+                                request.body.push(buffer[i]);
+                            }
+                        },
+                    }
+                    
+                }
+            }
+            let context_stream = stream.try_clone().expect("Unable to clone stream failed");
+            let mut context = Context::new(context_stream,request);
+
+            HttpListener::process(&mut context, Arc::clone(&settings));
+        }
+
+    }
+    //fn process(stream: TcpStream, settings: Arc<Settings>) {
+    fn process(context: &mut Context, settings: Arc<Settings>) {
         for (pattern,func) in &settings.routing_table {
             let re = Regex::new(pattern.as_str()).unwrap();
             if re.is_match(context.request.path.as_str()) {

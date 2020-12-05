@@ -18,7 +18,11 @@ impl Request {
             header: HashMap::new(),
             get: HashMap::new(),
             post: HashMap::new(),
+<<<<<<< master
             put: HashMap::new(),
+=======
+            body: Vec::new(),
+>>>>>>> Keepalive
         };
         //Break up lines
         let lines: Vec<&str> = request_header.lines().collect();
