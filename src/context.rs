@@ -154,6 +154,7 @@ pub struct Request {
     pub header: HashMap<String,String>,
     pub get: HashMap<String,String>,
     pub post: HashMap<String,String>,
+    pub put: HashMap<String,String>,
 }
 
 pub struct Response {

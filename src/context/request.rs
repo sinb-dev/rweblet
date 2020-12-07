@@ -18,6 +18,7 @@ impl Request {
             header: HashMap::new(),
             get: HashMap::new(),
             post: HashMap::new(),
+            put: HashMap::new(),
         };
         //Break up lines
         let lines: Vec<&str> = request_header.lines().collect();
@@ -66,6 +67,18 @@ impl Request {
                     let decoded = url::form_urlencoded::parse(lines[current_line].as_bytes());
                     for kv in decoded {
                         request.post.insert(kv.0.to_string(), kv.1.to_string());
+                    }
+                },
+                _ => (),
+            }
+        }
+        //If it is a put - look at putted data
+        if current_line+1 <= lines.len() {
+            match request.method {
+                HttpMethod::PUT => {
+                    let decoded = url::form_urlencoded::parse(lines[current_line].as_bytes());
+                    for kv in decoded {
+                        request.put.insert(kv.0.to_string(), kv.1.to_string());
                     }
                 },
                 _ => (),
