@@ -1,10 +1,139 @@
 use std::fmt::Display;
 use std::collections::HashMap;
-use crate::context::{HttpMethod, Request};
+use crate::context::{HttpMethod, Request, Context};
 use crate::HttpListener;
+use crate::Settings;
 use url::Url;
+use std::net::{TcpStream};
+use std::sync::Arc;
 
 impl Request {
+    pub fn handle_request(request_header: &str, stream: TcpStream, settings: Arc<Settings>) {
+        
+        let mut request = Request {
+            method: HttpMethod::GET,
+            protocol: String::new(),
+            user: String::new(),
+            password: String::new(),
+            url: String::new(),
+            path: String::new(),
+            querystring: String::new(),
+            header: HashMap::new(),
+            get: HashMap::new(),
+            post: HashMap::new(),
+            body: Vec::new(),
+            ready: false,
+        };
+        //Break up lines
+        let lines: Vec<&str> = request_header.lines().collect();
+        
+        if lines.len() == 0 {
+            //let msg: &str = request_header;
+            //let msg2: &str = format!("Bad request: '{}'",msg);
+            println!("Error: Request header contains no lines");
+            //return Err(request_header);
+            return;
+        }
+
+        //Analyze first line
+        let words: Vec<&str> = lines[0].split(" ").collect();
+        if words.len() < 3 {
+            println!("First line does not contain 3 words");
+            println!("Error: Request first line does not contain 3 words");
+            return;// Err("Bad request: empty request");
+        }
+
+        //headers
+        let mut content_length: usize = 0;
+
+        //Load all header data into request.header
+        let mut current_line = 1;
+        for i in current_line..lines.len() {
+            //println!("{}:\t{}\t{}\t{}",lines[i].len(), lines[i], lines[i] == "",content_length);
+            let opt = lines[i].find(':');
+            if lines[i] == "" && content_length == 0 {
+                //No further data to be read. We have all the headers we need.
+                request.ready = true;
+                println!("Request ready!");
+                break;
+            }
+
+            if opt.is_none() { break; }
+
+            let idx = opt.unwrap();
+            let key: String = lines[i].chars().take(idx).collect();
+            let value: String = lines[i].chars().skip(idx+1).collect();
+            let value = value.as_str().trim().to_string();
+            
+            if key == "Content-Length" {
+                content_length = match value.parse::<usize>() {
+                    Err(_) => 0,
+                    Ok(v) => v,
+                };
+                
+            }
+
+            request.header.insert(key, value);
+            current_line += 1;
+        }
+
+        
+
+        //Check request method
+        request.method = HttpMethod::from_str(words[0]);
+
+        //Fast forward to line that is not empty
+        if current_line < lines.len() {
+            for i in current_line..lines.len() {
+                if lines[i].trim().is_empty() {
+                    current_line += 1;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        //If it is a post - look at posted data
+        if current_line+1 <= lines.len() {
+            match request.method {
+                HttpMethod::POST => {
+                    let decoded = url::form_urlencoded::parse(lines[current_line].as_bytes());
+                    for kv in decoded {
+                        request.post.insert(kv.0.to_string(), kv.1.to_string());
+                    }
+                },
+                _ => (),
+            }
+        }
+
+        request.protocol = String::from("http");
+        let result = Url::parse(format!("{}://{}{}",request.protocol, request.header["Host"], words[1]).as_str());
+        if result.is_err() {
+            HttpListener::log(format!("Cannot parse {}",words[1]).as_str());
+            return; //Err("Failed to parse url");
+        }
+        let url = result.unwrap();
+        request.path = url.path().to_string();
+        
+        let query = url.query();
+        match query {
+            Some(q) => {
+                request.querystring = q.to_string();
+                let decoded = url::form_urlencoded::parse(request.querystring.as_bytes());
+                for kv in decoded {
+                    request.get.insert(kv.0.to_string(), kv.1.to_string());
+                }
+            },
+            _ => ()
+        }
+
+        if request.ready {
+            let context_stream = stream.try_clone().expect("Unable to clone stream failed");
+            let mut context = Context::new(context_stream,request);
+    
+            HttpListener::process(&mut context, Arc::clone(&settings), 0);
+        }
+    }
     pub fn from_request_data(request_header: &str) -> Result<Request, &str> {
         
         let mut request = Request {
@@ -19,29 +148,56 @@ impl Request {
             get: HashMap::new(),
             post: HashMap::new(),
             body: Vec::new(),
+            ready: false,
         };
         //Break up lines
         let lines: Vec<&str> = request_header.lines().collect();
+        
         if lines.len() == 0 {
-            return Err("Bad request");
+            //let msg: &str = request_header;
+            //let msg2: &str = format!("Bad request: '{}'",msg);
+            println!("Error: Request header contains no lines");
+            return Err(request_header);
         }
 
         //Analyze first line
         let words: Vec<&str> = lines[0].split(" ").collect();
         if words.len() < 3 {
-            return Err("Bad request");
+            println!("First line does not contain 3 words");
+            println!("Error: Request first line does not contain 3 words");
+            return Err("Bad request: empty request");
         }
+
+        //headers
+        let mut content_length: usize = 0;
 
         //Load all header data into request.header
         let mut current_line = 1;
         for i in current_line..lines.len() {
+            //println!("{}:\t{}\t{}\t{}",lines[i].len(), lines[i], lines[i] == "",content_length);
             let opt = lines[i].find(':');
+            if lines[i] == "" && content_length == 0 {
+                //No further data to be read. We have all the headers we need.
+                request.ready = true;
+                println!("Request ready!");
+                break;
+            }
+
             if opt.is_none() { break; }
 
             let idx = opt.unwrap();
             let key: String = lines[i].chars().take(idx).collect();
             let value: String = lines[i].chars().skip(idx+1).collect();
             let value = value.as_str().trim().to_string();
+            
+            if key == "Content-Length" {
+                content_length = match value.parse::<usize>() {
+                    Err(_) => 0,
+                    Ok(v) => v,
+                };
+                
+            }
+
             request.header.insert(key, value);
             current_line += 1;
         }
