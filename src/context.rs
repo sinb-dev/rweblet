@@ -131,6 +131,7 @@ pub struct Response {
     pub http_type: HttpResponseType,
     pub text: String,
     pub data: Vec<u8>,
+    pub mime: String,
     
 }
 

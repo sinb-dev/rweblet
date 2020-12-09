@@ -132,7 +132,7 @@ impl HttpListener {
 
             match mime.type_() {
                 mime_guess::mime::IMAGE | mime_guess::mime::APPLICATION | mime_guess::mime::AUDIO | mime_guess::mime::VIDEO => {
-                    context.write_response(Response::ok_bytes(buf));
+                    context.write_response(Response::ok_bytes(buf,"application/octet-stream"));
                 },
                 _ => {
                     context.write_mime_response(Response::ok_text(String::from_utf8_lossy(&buf).into_owned().as_str()), mime.essence_str())

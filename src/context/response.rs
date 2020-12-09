@@ -1,47 +1,68 @@
 use crate::context::{Response, HttpResponseType};
 impl Response {
     pub fn ok_text(response_html: &str) -> Response {
-        
-        Response {
-            http_type : HttpResponseType::Ok,
-            text : String::from("OK"),
-            data : String::from(response_html).into_bytes(),
-        }
+        Response::new(
+            HttpResponseType::Ok, 
+            "OK", 
+            String::from(response_html).into_bytes(),
+            "text/html",
+        )
     }
-    pub fn ok_bytes(data: Vec<u8>) -> Response {
-        
-        Response {
-            http_type : HttpResponseType::Ok,
-            text : String::from("OK"),
-            data : data,
-        }
+    pub fn ok_json(response_html: &str) -> Response {
+        Response::new(
+            HttpResponseType::Ok, 
+            "OK", 
+            String::from(response_html).into_bytes(),
+            "application/json",
+        )
+    }
+    pub fn ok_bytes(data: Vec<u8>, mime: &str) -> Response {
+        Response::new(
+            HttpResponseType::Ok, 
+            "OK", 
+            data,
+            mime,
+        )
     }
     pub fn notfound() -> Response {
-        Response {
-            http_type : HttpResponseType::NotFound,
-            text : String::from("File not found"),
-            data : String::from("<!DOCTYPE html><html><head><title>404 File not found</title></head><body><h1>404 File not found</h1></body></html>").into_bytes(),
-        }
+        Response::new(
+            HttpResponseType::NotFound, 
+            "File not found", 
+            String::from("<!DOCTYPE html><html><head><title>404 File not found</title></head><body><h1>404 File not found</h1></body></html>").into_bytes(),
+            "text/html"
+        )
     }
     pub fn none() -> Response {
-        Response {
-            http_type : HttpResponseType::None,
-            text : String::from(""),
-            data : String::from("").into_bytes(),
-        }
+        Response::new(
+            HttpResponseType::None, 
+            "", 
+            String::from("").into_bytes(),
+            "text/html"
+        )
     }
     pub fn cached(file: &str) -> Response {
-        Response {
-            http_type : HttpResponseType::None,
-            text : String::from("cached"),
-            data : String::from(file).into_bytes(),
-        }
+        Response::new(
+            HttpResponseType::None, 
+            "cached", 
+            String::from(file).into_bytes(),
+            "text/html"
+        )
     }
     pub fn internal_error() -> Response {
+        Response::new(
+            HttpResponseType::NotFound, 
+            "Internal server error", 
+            String::from("<!DOCTYPE html><html><head><title>500 Internal server error</title></head><body><h1>500 Internal server error</h1></body></html>").into_bytes(),
+            "text/html"
+        )
+    }
+    pub fn new(http_type: HttpResponseType, text: &str, data: Vec<u8>, mime: &str) -> Response {
         Response {
-            http_type : HttpResponseType::InternalError,
-            text : String::from("INTERNAL SERVER ERROR"),
-            data : String::new().into_bytes(),
+            http_type : http_type,
+            text : String::from(text),
+            data : data,
+            mime : String::from(mime),
         }
+
     }
 }
