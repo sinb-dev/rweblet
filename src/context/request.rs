@@ -165,6 +165,7 @@ impl Request {
         if words.len() < 3 {
             println!("First line does not contain 3 words");
             println!("Error: Request first line does not contain 3 words");
+            
             return Err("Bad request: empty request");
         }
 
@@ -201,6 +202,8 @@ impl Request {
             request.header.insert(key, value);
             current_line += 1;
         }
+
+        request.url = words[1].to_string();
 
         //Check request method
         request.method = HttpMethod::from_str(words[0]);
