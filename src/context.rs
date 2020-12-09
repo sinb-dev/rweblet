@@ -124,6 +124,7 @@ pub struct Request {
     pub get: HashMap<String,String>,
     pub post: HashMap<String,String>,
     pub put: HashMap<String,String>,
+    pub ready: bool,
 }
 
 pub struct Response {

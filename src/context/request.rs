@@ -21,7 +21,7 @@ impl Request {
             header: HashMap::new(),
             get: HashMap::new(),
             post: HashMap::new(),
-            body: Vec::new(),
+            put: HashMap::new(),
             ready: false,
         };
         //Break up lines
@@ -147,7 +147,7 @@ impl Request {
             header: HashMap::new(),
             get: HashMap::new(),
             post: HashMap::new(),
-            body: Vec::new(),
+            put: HashMap::new(),
             ready: false,
         };
         //Break up lines
