@@ -147,9 +147,6 @@ impl Request {
             header: HashMap::new(),
             get: HashMap::new(),
             post: HashMap::new(),
-<<<<<<< master
-            put: HashMap::new(),
-=======
             body: Vec::new(),
             ready: false,
         };
