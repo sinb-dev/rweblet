@@ -1,6 +1,7 @@
 use std::fmt::Display;
 use std::collections::HashMap;
 use crate::context::{HttpMethod, Request};
+use crate::HttpListener;
 use url::Url;
 
 impl Request {
@@ -17,6 +18,7 @@ impl Request {
             header: HashMap::new(),
             get: HashMap::new(),
             post: HashMap::new(),
+            put: HashMap::new(),
         };
         //Break up lines
         let lines: Vec<&str> = request_header.lines().collect();
@@ -70,11 +72,23 @@ impl Request {
                 _ => (),
             }
         }
+        //If it is a put - look at putted data
+        if current_line+1 <= lines.len() {
+            match request.method {
+                HttpMethod::PUT => {
+                    let decoded = url::form_urlencoded::parse(lines[current_line].as_bytes());
+                    for kv in decoded {
+                        request.put.insert(kv.0.to_string(), kv.1.to_string());
+                    }
+                },
+                _ => (),
+            }
+        }
 
         request.protocol = String::from("http");
         let result = Url::parse(format!("{}://{}{}",request.protocol, request.header["Host"], words[1]).as_str());
         if result.is_err() {
-            crate::httplistener::HttpListener::log(format!("Cannot parse {}",words[1]).as_str());
+            HttpListener::log(format!("Cannot parse {}",words[1]).as_str());
             return Err("Failed to parse url");
         }
         let url = result.unwrap();
