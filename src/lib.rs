@@ -8,8 +8,7 @@ use regex::Regex;
 use std::io::prelude::*;
 use std::fs::File;
 use std::sync::Arc;
-//use std::path::Path;
-
+use std::time::Duration;
 use mime_guess;
 
  // Expose Context, Response and Request from context in this mod
@@ -17,7 +16,6 @@ pub use crate::context::{Context, Response, Request, HttpResponseType};
 
 
 pub struct HttpListener {
-    uri : String,
     routing_table: HashMap<String,  fn(&Context)->Response >,
     cache: HashMap<String, (Vec<u8>,Option<mime_guess::Mime>)>,
     pub webroot : String,
@@ -26,7 +24,6 @@ pub struct HttpListener {
 impl HttpListener {
     pub fn new() -> HttpListener {
         HttpListener {
-            uri: String::from(""),
             routing_table: HashMap::new(),
             cache: HashMap::new(),
             webroot: String::new(),
@@ -50,36 +47,61 @@ impl HttpListener {
         let settings = Settings::new(&self.webroot, routing);
         let arc_settings = Arc::new(settings);
         
-        let mut counter = 0;
         for stream in listener.incoming()
         {
             let stream = stream.unwrap();
-            counter+=1;
-            if counter % 200 == 0 {
-                println!("Received {} requests", counter);
+
+            //Prevents the tcp read from blocking more than 5 msecs
+            loop {
+                let result = stream.set_read_timeout(Some(Duration::from_millis(5)));
+                if result.is_ok() {
+                    break;
+                }
             }
-            if counter  == 1 {
-                println!("Received first requst");
-            }
-            let clone = Arc::clone(&arc_settings);
-            if thread_count > 1 {
-                pool.execute(|| {
-                    HttpListener::handle_connection_static(stream, clone);
+            
+            let settings = Arc::clone(&arc_settings);
+           
+            if thread_count >= 1 {
+                pool.execute(move || {
+                    HttpListener::process_header(stream, settings);
+                    
                 });
-            } else {
-                HttpListener::handle_connection_static(stream, clone);
             }
         }
     }
 
-    fn handle_connection_static(stream: TcpStream, settings: Arc<Settings>) {
-        
-        let context = Context::new(stream);
-        let mut context = match context {
-            Ok(r) => r,
-            Err(_) => return,
-        };
-        
+    fn process_header(mut stream: TcpStream, settings: Arc<Settings>) {
+        let mut buffer = [0; 8192];
+        let mut idle_threshold = 5;
+        loop {
+            let read_result  = stream.read(&mut buffer);
+            match read_result {
+                Err(_) => { println!("Failed to read from stream"); break; },
+                Ok(header_size) => {
+                    //println!("Read {} bytes", header_size);
+                    if header_size > 0 { 
+                        let request_header: String = String::from_utf8_lossy(&buffer[0..header_size]).to_string();
+                
+                        Request::handle_request(&request_header, stream.try_clone().unwrap(), Arc::clone(&settings));
+                    } else {
+                        if idle_threshold > 0 {
+                            idle_threshold -= 1;
+                        }
+                        else {
+                            //stream.shutdown(Shutdown::Both);
+                            //println!("Terminated connection");
+                            break;
+
+                        }
+                        //println!("Timeout: {}",timeout);
+                    }
+                },
+            }
+        }
+    }
+
+    //fn process(stream: TcpStream, settings: Arc<Settings>) {
+    fn process(context: &mut Context, settings: Arc<Settings>, counter: usize) {
         for (pattern,func) in &settings.routing_table {
             let re = Regex::new(pattern.as_str()).unwrap();
             if re.is_match(context.request.path.as_str()) {
@@ -89,7 +111,7 @@ impl HttpListener {
                     HttpResponseType::None => {
                         &mut context.write_cache(String::from_utf8_lossy(&response.data).into_owned().as_str()); return; 
                     },
-                    _ => { &mut context.write_response(response); return; }
+                    _ => { &mut context.write_response(response); println!("Wrote response number {}",counter); return; }
                 }
             }
         }
@@ -156,13 +178,13 @@ impl HttpListener {
     }
 }
 
-struct Settings {
+pub struct Settings {
     //routing_table: Box<HashMap<String, fn(&Context)->Response >>,
     routing_table: HashMap<String, fn(&Context)->Response >,
     webroot: String,
 }
 impl Settings {
-    fn new(webroot: &str, routing_table: HashMap<String,  fn(&Context)->Response >) -> Settings {
+    pub fn new(webroot: &str, routing_table: HashMap<String,  fn(&Context)->Response >) -> Settings {
         let webroot = String::from(webroot);
         //let routing_table = Box::new(routing_table);
         Settings { routing_table, webroot }
