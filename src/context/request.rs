@@ -265,7 +265,6 @@ impl Request {
             },
             _ => ()
         }
-
         Ok(request)
     }
 }
