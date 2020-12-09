@@ -106,7 +106,9 @@ impl Request {
             }
         }
 
+        request.url = words[1].to_string();
         request.protocol = String::from("http");
+
         let result = Url::parse(format!("{}://{}{}",request.protocol, request.header["Host"], words[1]).as_str());
         if result.is_err() {
             HttpListener::log(format!("Cannot parse {}",words[1]).as_str());
@@ -203,8 +205,6 @@ impl Request {
             current_line += 1;
         }
 
-        request.url = words[1].to_string();
-        println!("Requested url: {}",request.url);
 
         //Check request method
         request.method = HttpMethod::from_str(words[0]);
