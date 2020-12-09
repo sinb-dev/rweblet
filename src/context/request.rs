@@ -204,6 +204,7 @@ impl Request {
         }
 
         request.url = words[1].to_string();
+        println!("Requested url: {}",request.url);
 
         //Check request method
         request.method = HttpMethod::from_str(words[0]);
